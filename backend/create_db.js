@@ -37,20 +37,27 @@ async function initDB() {
   }
 
   // Ahora nos conectamos a la base de datos recién creada
-  const clientApp = new Client({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: String(process.env.DB_PASSWORD || ''),
-    port: process.env.DB_PORT,
-  });
+  const dbConfig = process.env.DATABASE_URL 
+    ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
+    : {
+        user: process.env.DB_USER,
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        password: String(process.env.DB_PASSWORD || ''),
+        port: process.env.DB_PORT,
+      };
 
+  const clientApp = new Client(dbConfig);
 
   try {
     await clientApp.connect();
     
-    // Leemos el archivo schema.sql
-    const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
+    // Leemos el archivo schema.sql (buscando primero en el mismo directorio de backend)
+    let schemaPath = path.join(__dirname, 'schema.sql');
+    if (!fs.existsSync(schemaPath)) {
+      schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
+    }
+    
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
     
     // Ejecutamos todo el script
