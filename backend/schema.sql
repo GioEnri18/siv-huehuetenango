@@ -1,11 +1,5 @@
 -- SIV Huehuetenango - Database Schema
 
--- Extensión para uuid y otras utilidades si se requieren (opcional)
--- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- ==========================================
--- FUNCIONES DE UTILIDAD (Triggers)
--- ==========================================
 CREATE OR REPLACE FUNCTION trg_actualizar_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -14,11 +8,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- ==========================================
--- TABLAS
--- ==========================================
-
--- 1. Puesto de Salud (Se crea primero para evitar dependencias circulares complejas)
 CREATE TABLE IF NOT EXISTS puesto_salud (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(150) NOT NULL,
@@ -26,12 +15,11 @@ CREATE TABLE IF NOT EXISTS puesto_salud (
     comunidad VARCHAR(150) NOT NULL,
     estado VARCHAR(20) DEFAULT 'Activo' CHECK (estado IN ('Activo','Inactivo','Anulado')),
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    creado_por INTEGER, -- Se vincula luego a usuario
+    creado_por INTEGER,
     actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    actualizado_por INTEGER -- Se vincula luego a usuario
+    actualizado_por INTEGER
 );
 
--- 2. Perfil (Roles del sistema)
 CREATE TABLE IF NOT EXISTS perfil (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL UNIQUE,
@@ -43,7 +31,6 @@ CREATE TABLE IF NOT EXISTS perfil (
     actualizado_por INTEGER
 );
 
--- 3. Usuario
 CREATE TABLE IF NOT EXISTS usuario (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(150) NOT NULL,
@@ -59,33 +46,15 @@ CREATE TABLE IF NOT EXISTS usuario (
     actualizado_por INTEGER REFERENCES usuario(id)
 );
 
--- Agregar FKs pendientes de creado_por y actualizado_por a puesto_salud y perfil
-DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_puesto_creado_por') THEN
-        ALTER TABLE puesto_salud ADD CONSTRAINT fk_puesto_creado_por FOREIGN KEY (creado_por) REFERENCES usuario(id);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_puesto_actualizado_por') THEN
-        ALTER TABLE puesto_salud ADD CONSTRAINT fk_puesto_actualizado_por FOREIGN KEY (actualizado_por) REFERENCES usuario(id);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_perfil_creado_por') THEN
-        ALTER TABLE perfil ADD CONSTRAINT fk_perfil_creado_por FOREIGN KEY (creado_por) REFERENCES usuario(id);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_perfil_actualizado_por') THEN
-        ALTER TABLE perfil ADD CONSTRAINT fk_perfil_actualizado_por FOREIGN KEY (actualizado_por) REFERENCES usuario(id);
-    END IF;
-END $$;
-
--- 4. Login (Bitácora de sesión)
 CREATE TABLE IF NOT EXISTS login (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER REFERENCES usuario(id),
     fecha_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ip_origen VARCHAR(50),
-    resultado VARCHAR(50), -- Exitoso, Fallido
+    resultado VARCHAR(50),
     token_jti VARCHAR(255)
 );
 
--- 5. Perfil Usuario Detalle (Ficha personal)
 CREATE TABLE IF NOT EXISTS perfil_usuario_detalle (
     id SERIAL PRIMARY KEY,
     usuario_id INTEGER REFERENCES usuario(id) UNIQUE,
@@ -93,7 +62,7 @@ CREATE TABLE IF NOT EXISTS perfil_usuario_detalle (
     dpi VARCHAR(20) UNIQUE,
     cargo VARCHAR(100),
     fecha_ingreso DATE,
-    idiomas JSONB DEFAULT '[]', -- ej: ["Español", "Mam"]
+    idiomas JSONB DEFAULT '[]',
     estado VARCHAR(20) DEFAULT 'Activo' CHECK (estado IN ('Activo','Inactivo','Anulado')),
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     creado_por INTEGER REFERENCES usuario(id),
@@ -101,7 +70,6 @@ CREATE TABLE IF NOT EXISTS perfil_usuario_detalle (
     actualizado_por INTEGER REFERENCES usuario(id)
 );
 
--- 6. Tutor
 CREATE TABLE IF NOT EXISTS tutor (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(150) NOT NULL,
@@ -114,7 +82,6 @@ CREATE TABLE IF NOT EXISTS tutor (
     actualizado_por INTEGER REFERENCES usuario(id)
 );
 
--- 7. Niño
 CREATE TABLE IF NOT EXISTS nino (
     id SERIAL PRIMARY KEY,
     cui VARCHAR(15) UNIQUE NOT NULL,
@@ -133,7 +100,6 @@ CREATE TABLE IF NOT EXISTS nino (
     actualizado_por INTEGER REFERENCES usuario(id)
 );
 
--- 8. Biológico (Catálogo de vacunas)
 CREATE TABLE IF NOT EXISTS biologico (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL UNIQUE,
@@ -145,7 +111,6 @@ CREATE TABLE IF NOT EXISTS biologico (
     actualizado_por INTEGER REFERENCES usuario(id)
 );
 
--- 9. Esquema Dosis (Calendario)
 CREATE TABLE IF NOT EXISTS esquema_dosis (
     id SERIAL PRIMARY KEY,
     biologico_id INTEGER REFERENCES biologico(id),
@@ -160,7 +125,6 @@ CREATE TABLE IF NOT EXISTS esquema_dosis (
     UNIQUE (biologico_id, numero_dosis)
 );
 
--- 10. Dosis Aplicada
 CREATE TABLE IF NOT EXISTS dosis_aplicada (
     id SERIAL PRIMARY KEY,
     nino_id INTEGER REFERENCES nino(id),
@@ -178,7 +142,6 @@ CREATE TABLE IF NOT EXISTS dosis_aplicada (
     actualizado_por INTEGER REFERENCES usuario(id)
 );
 
--- 11. Alerta Rezago
 CREATE TABLE IF NOT EXISTS alerta_rezago (
     id SERIAL PRIMARY KEY,
     nino_id INTEGER REFERENCES nino(id),
@@ -192,7 +155,6 @@ CREATE TABLE IF NOT EXISTS alerta_rezago (
     actualizado_por INTEGER REFERENCES usuario(id)
 );
 
--- 12. Incidente Dosis (Desperfectos)
 CREATE TABLE IF NOT EXISTS incidente_dosis (
     id SERIAL PRIMARY KEY,
     biologico_id INTEGER REFERENCES biologico(id),
@@ -211,7 +173,6 @@ CREATE TABLE IF NOT EXISTS incidente_dosis (
     actualizado_por INTEGER REFERENCES usuario(id)
 );
 
--- 13. Lote Inventario
 CREATE TABLE IF NOT EXISTS lote_inventario (
     id SERIAL PRIMARY KEY,
     biologico_id INTEGER REFERENCES biologico(id),
@@ -231,7 +192,6 @@ CREATE TABLE IF NOT EXISTS lote_inventario (
     CONSTRAINT unique_lote_puesto UNIQUE (codigo_lote, biologico_id, puesto_id)
 );
 
--- 14. Ingreso Vacuna (Recepción y Ticket)
 CREATE TABLE IF NOT EXISTS ingreso_vacuna (
     id SERIAL PRIMARY KEY,
     numero_ticket VARCHAR(50) UNIQUE NOT NULL,
@@ -255,7 +215,6 @@ CREATE TABLE IF NOT EXISTS ingreso_vacuna (
     actualizado_por INTEGER REFERENCES usuario(id)
 );
 
--- 15. Salida Vacuna (Egresos y Traslados)
 CREATE TABLE IF NOT EXISTS salida_vacuna (
     id SERIAL PRIMARY KEY,
     numero_comprobante VARCHAR(50) UNIQUE NOT NULL,
@@ -275,55 +234,6 @@ CREATE TABLE IF NOT EXISTS salida_vacuna (
     actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     actualizado_por INTEGER REFERENCES usuario(id)
 );
-
--- ==========================================
--- ASIGNACIÓN DE TRIGGERS
--- ==========================================
-DROP TRIGGER IF EXISTS trg_puesto_salud_upd ON puesto_salud;
-CREATE TRIGGER trg_puesto_salud_upd BEFORE UPDATE ON puesto_salud FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_perfil_upd ON perfil;
-CREATE TRIGGER trg_perfil_upd BEFORE UPDATE ON perfil FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_usuario_upd ON usuario;
-CREATE TRIGGER trg_usuario_upd BEFORE UPDATE ON usuario FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_perfil_usuario_upd ON perfil_usuario_detalle;
-CREATE TRIGGER trg_perfil_usuario_upd BEFORE UPDATE ON perfil_usuario_detalle FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_tutor_upd ON tutor;
-CREATE TRIGGER trg_tutor_upd BEFORE UPDATE ON tutor FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_nino_upd ON nino;
-CREATE TRIGGER trg_nino_upd BEFORE UPDATE ON nino FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_biologico_upd ON biologico;
-CREATE TRIGGER trg_biologico_upd BEFORE UPDATE ON biologico FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_esquema_dosis_upd ON esquema_dosis;
-CREATE TRIGGER trg_esquema_dosis_upd BEFORE UPDATE ON esquema_dosis FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_dosis_aplicada_upd ON dosis_aplicada;
-CREATE TRIGGER trg_dosis_aplicada_upd BEFORE UPDATE ON dosis_aplicada FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_alerta_rezago_upd ON alerta_rezago;
-CREATE TRIGGER trg_alerta_rezago_upd BEFORE UPDATE ON alerta_rezago FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_incidente_dosis_upd ON incidente_dosis;
-CREATE TRIGGER trg_incidente_dosis_upd BEFORE UPDATE ON incidente_dosis FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_lote_inventario_upd ON lote_inventario;
-CREATE TRIGGER trg_lote_inventario_upd BEFORE UPDATE ON lote_inventario FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_ingreso_vacuna_upd BEFORE UPDATE ON ingreso_vacuna;
-CREATE TRIGGER trg_ingreso_vacuna_upd BEFORE UPDATE ON ingreso_vacuna FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
-DROP TRIGGER IF EXISTS trg_salida_vacuna_upd ON salida_vacuna;
-CREATE TRIGGER trg_salida_vacuna_upd BEFORE UPDATE ON salida_vacuna FOR EACH ROW EXECUTE FUNCTION trg_actualizar_timestamp();
-
--- ==========================================
--- DATOS INICIALES
--- ==========================================
 
 -- Perfiles
 INSERT INTO perfil (nombre, permisos) VALUES
